@@ -1,0 +1,98 @@
+
+
+Column1.GroupId	Column1.Name
+-9174036292747631049	Africa MixEA - Teletrac Fleet Solutions - OLA ENERGY (U) LTD
+-8850975831537044131	Africa MixEA - Teletrac Fleet Solutions - RWENZORI COTTON GINNERS CO.LTD
+-6286588465443382877	TotalEnergies-MS/AFR-Uganda-LV-D/LHV-D
+-6171806957116354135	TotalEnergies-MS/AFR-Uganda-HV-D
+-5769127673481834813	Africa MixEA - Teletrac Fleet Solutions - Mansons (U) Ltd
+-4944176959690446336	Africa MixEA - Teletrac Fleet Solutions - AGL
+-4896381956688787541	Africa MixEA - Teletrac Fleet Solutions - Hardware World
+-4704474690248642151	Africa MixEA - Teletrac Fleet Solutions - Zulu Comm Consult
+-4594950929273959593	Africa MixEA - Teletrac Fleet Solutions - VENGAR ENERGY LTD
+-2828170216671818905	Africa MixEA - Teletrac Fleet Solutions - SUS-TECH Limited
+105766443484073750	Africa MixEA - Teletrac Fleet solutions - Ssaka Bulk Hauliers
+750564533632365070	Africa MixEA - Teletrac Fleet Solutions - ADT logistics
+1547352711714252299	Africa MixEA - COSL UGANDA - SMC LTD
+1588619939476226048	Africa MixEA - Teletrac Fleet Solutions - DT Logistics
+1590150132141592576	Africa MixEA - Teletrac Fleet Solutions - DAR ES SALAAM FLYING DOCTORS LIMITED
+1801085229072432276	Africa MixEA - Teletrac Fleet Solutions - ROY TRANSMOTORS LIMITED
+3522227434242123843	Africa MixEA - Teletrac Fleet Solutions - SIBED INTERNATIONAL
+3561403388247975951	TotalEnergies-EP/AFR-Uganda-HV-D
+3628398648865783745	Africa MixEA - Teletrac Fleet Solutions - TFSL
+3774519666531842858	Africa MixEA - Teletrac Fleet Solutions - Unilever Uganda Ltd
+4231887522457813126	Africa MixEA - Transfleet Services - Africa Global Logistics Uganda Ltd
+4785136115183855181	Africa MixEA - Teletrac Fleet Solutions - Demo
+5225872178639519601	Africa MixEA - Teletrac Fleet Solutions - China Petroleum Pipeline Co. Ltd
+6493116412128327151	TotalEnergies-MS/AFR-Uganda-LV-HV (Local)
+7648770037745045618	Africa MixEA - Teletrac Fleet Solutions - VEUL
+7863428056380165082	Africa MixEA - Teletrac Fleet Solutions - Fred Sebyala Transporters Ltd
+7900116766269641394	Africa MixEA - Teletrac Fleet Solutions - Harry Transporters Ltd
+8111229878236716938	Africa MixEA - Teletrac Fleet Solutions - Aisha Tumusiime
+8221725616980128168	Africa MixEA - Teletrac Fleet Solutions - Globe Trotters Ltd
+
+
+
+8221725616980128168, 8111229878236716938, -4944176959690446336
+
+
+
+/positions_date_range code
+
+
+let
+    // Editable parameters - list of organisation IDs
+    Parameters = [
+        organisationIds = {8221725616980128168, 8111229878236716938, -4944176959690446336},  // Group ID (or Organisation ID)
+        fromDate = DateTime.ToText(DateTime.From(DateTime.Date(DateTime.LocalNow()) & #time(0, 0, 0)), "yyyyMMddHHmmss"), // Current date at midnight (00:00:00)
+        toDate = DateTime.ToText(DateTime.From(DateTime.Date(DateTime.LocalNow()) & #time(23, 59, 59)), "yyyyMMddHHmmss") // Current date at 23:59:59
+    ],
+
+    // Convert the list of organisationIds into a JSON-style string
+    organisationIdsString = "[" & Text.Combine(List.Transform(Parameters[organisationIds], each Text.From(_)), ", ") & "]",
+
+    // Construct the JSON body using the organisationIdsString and the from/to date range
+    body = "{ ""organisationIds"": " & organisationIdsString & ", ""fromDate"": """ & Parameters[fromDate] & """, ""toDate"": """ & Parameters[toDate] & """ }",
+
+    // Define the URL of your Flask API
+    url = "http://127.0.0.1:5000/positions_date_range",  // Adjust URL as needed
+
+    // Make the API request with the body and headers
+    Source = try Json.Document(Web.Contents(url, [
+        Content = Text.ToBinary(body),
+        Headers = [#"Content-Type"="application/json"]
+    ])) otherwise error "API request failed. Please check the URL or parameters.",
+
+    // Check if the source is null and return an error message if so
+    SourceWithErrorHandling = if Source = null then error "API returned no data." else Source,
+
+    // Step 3: Convert the list to a table (each row contains one organisation's data)
+    DataTable = Table.FromList(SourceWithErrorHandling, Splitter.SplitByNothing(), {"OrganisationRecord"}),
+
+    // Step 4: Transform each record into a table with organisation ID and list of assets
+    ExtractedData = Table.AddColumn(
+        DataTable, 
+        "OrganisationData", 
+        each Record.ToTable([OrganisationRecord])
+    ),
+
+    // Step 5: Expand the OrganisationData column to separate rows
+    ExpandedData = Table.ExpandTableColumn(
+        ExtractedData, 
+        "OrganisationData", 
+        {"Name", "Value"}
+    ),
+
+    // Step 6: Rename columns for clarity
+    RenamedColumns = Table.RenameColumns(
+        ExpandedData, 
+        {{"Name", "OrganisationId"}, {"Value", "Assets"}}
+    ),
+
+    // Step 7: Expand the Assets column (each asset is a record)
+    ExpandedAssets = Table.ExpandListColumn(RenamedColumns, "Assets"),
+    
+    // Step 8: Expand the asset records into individual columns
+    FinalTable = Table.ExpandRecordColumn(ExpandedAssets, "Assets", {"AssetId", "FormattedAddress", "Latitude", "Longitude", "OdometerKilometres", "PositionId", "SpeedKilometresPerHour", "Timestamp"}, {"AssetId", "FormattedAddress", "Latitude", "Longitude", "OdometerKilometres", "PositionId", "SpeedKilometresPerHour", "Timestamp"})
+in
+    FinalTable
