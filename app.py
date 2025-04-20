@@ -56,6 +56,33 @@ def make_api_request(url, headers, payload=None):
         logging.error(f"Request failed: {str(e)}")
         return {"error": str(e)}
 
+
+
+# Endpoint 0: Get assets for multiple organisations
+@app.route('/sites', methods=['GET'])
+def get_sites():
+    org_ids = request.args.get('organisationIds')
+    if not org_ids:
+        return jsonify({"error": "organisationIds parameter is required"}), 400
+
+    access_token = get_access_token()
+    if not access_token:
+        return jsonify({"error": "Failed to retrieve access token"}), 500
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    all_assets = []
+
+    for i, org_id in enumerate(org_ids.split(',')):
+        if i > 0:
+            time.sleep(2)
+        url = f"https://integrate.za.mixtelematics.com/api/organisationgroups/subgroups/{org_id}"
+        all_assets.append({org_id: make_api_request(url, headers)})
+
+    return jsonify(all_assets)
+
+
+
+
 # Endpoint 1: Get list of organisations
 @app.route('/organisations', methods=['GET'])
 def get_organisations():
@@ -88,7 +115,7 @@ def get_assets():
 
     for i, org_id in enumerate(org_ids.split(',')):
         if i > 0:
-            time.sleep(30)
+            time.sleep(2)
         url = f"https://integrate.za.mixtelematics.com/api/assets/group/{org_id}"
         all_assets.append({org_id: make_api_request(url, headers)})
 
@@ -110,7 +137,7 @@ def get_drivers():
 
     for i, org_id in enumerate(org_ids.split(',')):
         if i > 0:
-            time.sleep(30)
+            time.sleep(2)
         url = f"https://integrate.za.mixtelematics.com/api/drivers/organisation/{org_id}"
         all_drivers.append({org_id: make_api_request(url, headers)})
 
@@ -132,7 +159,7 @@ def get_events():
 
     for i, org_id in enumerate(org_ids.split(',')):
         if i > 0:
-            time.sleep(30)
+            time.sleep(2)
         url = f"https://integrate.za.mixtelematics.com/api/libraryevents/organisation/{org_id}"
         all_events.append({org_id: make_api_request(url, headers)})
 
@@ -158,7 +185,7 @@ def get_positions():
 
     for i, org_id in enumerate(org_ids):
         if i > 0:
-            time.sleep(30)  # Delay between requests after the first one
+            time.sleep(2)  # Delay between requests after the first one
 
         # Payload must be a simple JSON array containing the organisationId
         payload = [org_id]
@@ -200,7 +227,7 @@ def get_trips_by_entitytype():
     # Loop through all organisations and make a separate API call
     for i, org_id in enumerate(organisation_ids):
         if i > 0:
-            time.sleep(35)  # Adding a delay between API calls
+            time.sleep(2)  # Adding a delay between API calls
 
         url = f"https://integrate.za.mixtelematics.com/api/trips/groups/from/{from_date}/to/{to_date}/entitytype/Asset?includeSubtrips={str(include_subtrips).lower()}"
         payload = [org_id]
@@ -228,7 +255,7 @@ def get_positions_date_range():
     # Loop through all organisations and make a separate API call
     for i, org_id in enumerate(organisation_ids):
         if i > 0:
-            time.sleep(30)  # Adding a delay between API calls
+            time.sleep(2)  # Adding a delay between API calls
         url = f"https://integrate.za.mixtelematics.com/api/positions/groups/from/{from_date}/to/{to_date}"
         payload = [org_id]
         all_positions.append({org_id: make_api_request(url, headers, payload)})
@@ -253,7 +280,7 @@ def get_events_since():
     # Loop through all organisations and make a separate API call
     for i, org_id in enumerate(organisation_ids):
         if i > 0:
-            time.sleep(30)  # Adding a delay between API calls
+            time.sleep(2)  # Adding a delay between API calls
 
         url = f"https://integrate.za.mixtelematics.com/api/events/groups/createdsince/organisation/{org_id}/sincetoken/{since_token}/quantity/{quantity}"
         response = make_api_request(url, headers, {})
@@ -280,7 +307,7 @@ def get_events_since_filtered():
     # Loop through all organisations and make a separate API call
     for i, org_id in enumerate(organisation_ids):
         if i > 0:
-            time.sleep(30)  # Adding a delay between API calls
+            time.sleep(2)  # Adding a delay between API calls
 
         url = f"https://integrate.za.mixtelematics.com/api/events/groups/createdsince/organisation/{org_id}/sincetoken/{since_token}/quantity/{quantity}"
         payload = event_type_ids
@@ -306,7 +333,7 @@ def get_positions_since():
     # Loop through all organisations and make a separate API call
     for i, org_id in enumerate(organisation_ids):
         if i > 0:
-            time.sleep(30)  # Adding a delay between API calls
+            time.sleep(2)  # Adding a delay between API calls
 
         url = f"https://integrate.za.mixtelematics.com/api/positions/groups/createdsince/organisation/{org_id}/sincetoken/{since_token}/quantity/{quantity}"
         response = make_api_request(url, headers, {})
@@ -332,7 +359,7 @@ def get_trips_since():
     # Loop through all organisations and make a separate API call
     for i, org_id in enumerate(organisation_ids):
         if i > 0:
-            time.sleep(30)  # Adding a delay between API calls
+            time.sleep(2)  # Adding a delay between API calls
 
         url = f"https://integrate.za.mixtelematics.com/api/trips/groups/createdsince/organisation/{org_id}/sincetoken/{since_token}/quantity/{quantity}"
         response = make_api_request(url, headers, {})
@@ -347,4 +374,4 @@ def get_trips_since():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True)
